@@ -1,7 +1,7 @@
 package com.example.webcalendar.controller;
 
 import com.example.webcalendar.model.Event;
-import com.example.webcalendar.repository.EventRepository;
+import com.example.webcalendar.service.EventService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -13,11 +13,10 @@ import java.util.Optional;
 @RestController
 @RequestMapping("/event")
 public class EventController {
+    private final EventService eventService;
 
-    private final EventRepository eventRepository;
-
-    public EventController(EventRepository eventRepository) {
-        this.eventRepository = eventRepository;
+    public EventController(EventService eventService) {
+        this.eventService = eventService;
     }
 
     @PostMapping
@@ -25,26 +24,24 @@ public class EventController {
         if (event.getEvent() == null || event.getEvent().trim().isEmpty() || event.getDate() == null) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(null);
         }
-        eventRepository.save(event);
+        Event savedEvent = eventService.addEvent(event);
         return ResponseEntity.status(HttpStatus.OK).body(Map.of(
                 "message", "The event has been added!",
-                "event", event.getEvent(),
-                "date", event.getDate()
+                "event", savedEvent.getEvent(),
+                "date", savedEvent.getDate()
         ));
     }
 
     @GetMapping
     public ResponseEntity<List<Event>> getEvents(@RequestParam(name = "start_time", required = false) String start_time,
                                                  @RequestParam(name = "end_time", required = false) String end_time) {
-        List<Event> events;
-
+        LocalDate startDate = null;
+        LocalDate endDate = null;
         if (start_time != null && end_time != null) {
-            LocalDate startDate = LocalDate.parse(start_time);
-            LocalDate endDate = LocalDate.parse(end_time);
-            events = eventRepository.findByDateBetween(startDate, endDate);
-        } else {
-            events = eventRepository.findAll();
+            startDate = LocalDate.parse(start_time);
+            endDate = LocalDate.parse(end_time);
         }
+        List<Event> events = eventService.getEvents(startDate, endDate);
         if (events.isEmpty()) {
             return ResponseEntity.status(HttpStatus.NO_CONTENT).body(null);
         }
@@ -52,8 +49,8 @@ public class EventController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<?> getEventById(@PathVariable(name = "id") int id) {
-        Optional<Event> event = eventRepository.findById(id);
+    public ResponseEntity<?> getEvent(@PathVariable(name = "id") int id) {
+        Optional<Event> event = eventService.getEventById(id);
         if (event.isEmpty()) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", "The event doesn't exist!"));
         }
@@ -61,18 +58,18 @@ public class EventController {
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<?> deleteEventById(@PathVariable(name = "id") int id) {
-        Optional<Event> event = eventRepository.findById(id);
+    public ResponseEntity<?> deleteEvent(@PathVariable(name = "id") int id) {
+        Optional<Event> event = eventService.getEventById(id);
         if (event.isEmpty()) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", "The event doesn't exist!"));
         }
-        eventRepository.deleteById(id);
+        eventService.deleteEventById(id);
         return ResponseEntity.status(HttpStatus.OK).body(event.get());
     }
 
     @GetMapping("/today")
-    public ResponseEntity<List<Event>> getTodayEvents() {
-        List<Event> events = eventRepository.findByDate(LocalDate.now());
+    public ResponseEntity<List<Event>> getTodayEvent() {
+        List<Event> events = eventService.getTodayEvents();
         return ResponseEntity.status(HttpStatus.OK).body(events);
     }
 }
